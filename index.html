@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔥 Somnia Monopoly | Solo Blockchain Game</title>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.8.0/dist/web3.min.js"></script>
+    <style>
+        :root {
+            --somnia-purple: #6e45e2;
+            --somnia-teal: #88d3ce;
+            --somnia-pink: #ff7e5f;
+            --somnia-dark: #0f0c29;
+        }
+        
+        body {
+            margin: 0;
+            background: var(--somnia-dark);
+            color: white;
+            font-family: 'Arial', sans-serif;
+            overflow-x: hidden;
+        }
+        
+        #gameContainer {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            height: 100vh;
+        }
+        
+        #board {
+            position: relative;
+            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M0,0 L100,0 L100,100 L0,100 Z" fill="%230f0c29"/><path d="M10,10 L90,10 L90,90 L10,90 Z" fill="none" stroke="%236e45e2" stroke-width="0.5"/></svg>');
+            background-size: cover;
+        }
+        
+        #uiPanel {
+            background: rgba(15, 12, 41, 0.95);
+            padding: 20px;
+            border-left: 3px solid var(--somnia-purple);
+            overflow-y: auto;
+        }
+        
+        .tile {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            border: 2px solid var(--somnia-teal);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-size: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: rgba(30, 30, 63, 0.7);
+            padding: 5px;
+            box-sizing: border-box;
+        }
+        
+        .tile:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 15px var(--somnia-pink);
+            z-index: 10;
+        }
+        
+        .tile-profit {
+            border-color: #4CAF50;
+            background: rgba(76, 175, 80, 0.2);
+        }
+        
+        .tile-loss {
+            border-color: #F44336;
+            background: rgba(244, 67, 54, 0.2);
+        }
+        
+        .player-token {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            z-index: 5;
+            transition: all 0.5s ease-out;
+            background: var(--somnia-pink);
+            border: 2px solid white;
+        }
+        
+        #diceResult {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--somnia-purple);
+            padding: 15px 25px;
+            border-radius: 10px;
+            font-size: 24px;
+            display: none;
+            z-index: 20;
+        }
+        
+        #walletPanel {
+            background: rgba(110, 69, 226, 0.2);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        #connectWallet {
+            background: var(--somnia-purple);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            width: 100%;
+        }
+        
+        #connectWallet:hover {
+            background: var(--somnia-pink);
+            transform: translateY(-2px);
+        }
+        
+        #gameActions {
+            display: grid;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        .game-btn {
+            background: linear-gradient(135deg, var(--somnia-purple), #8a2be2);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        
+        .game-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(255, 126, 95, 0.4);
+        }
+        
+        .game-btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+            transform: none;
+            opacity: 0.7;
+        }
+        
+        #tileDetails {
+            background: rgba(30, 30, 63, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            border: 1px solid var(--somnia-teal);
+        }
+        
+        .dice-animation {
+            animation: shake 0.5s;
+        }
+        
+        @keyframes shake {
+            0% { transform: translateX(0) rotate(0deg); }
+            25% { transform: translateX(-5px) rotate(-5deg); }
+            50% { transform: translateX(5px) rotate(5deg); }
+            75% { transform: translateX(-5px) rotate(-5deg); }
+            100% { transform: translateX(0) rotate(0deg); }
+        }
+        
+        .loading {
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+        
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            background-color: rgba(110, 69, 226, 0.1);
+            border-radius: 3px;
+            font-size: 14px;
+            word-break: break-word;
+        }
+        
+        .log-entry-profit {
+            color: #4CAF50;
+        }
+        
+        .log-entry-loss {
+            color: #F44336;
+        }
+        
+        .log-entry-neutral {
+            color: var(--somnia-teal);
+        }
+        
+        .auto-refresh-toggle {
+            display: flex;
+            align-items: center;
+            margin-top: 15px;
+            font-size: 14px;
+        }
+        
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+            margin-right: 10px;
+        }
+        
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: var(--somnia-purple);
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <!-- Game Board -->
+        <div id="board">
+            <!-- Tiles will be added dynamically -->
+            <div id="diceResult"></div>
+        </div>
+        
+        <!-- Game UI -->
+        <div id="uiPanel">
+            <h1 style="color: var(--somnia-teal); margin-top: 0;">SOMNIA MONOPOLY</h1>
+            <p style="color: var(--somnia-pink);">On-chain solo board game powered by Somnia</p>
+            
+            <div id="walletPanel">
+                <button id="connectWallet">CONNECT SOMNIA WALLET</button>
+                <div id="walletInfo" style="margin-top: 10px; display: none;">
+                    <div>Connected: <span id="walletAddress" style="color: var(--somnia-teal);"></span></div>
+                    <div>Balance: <span id="somBalance" style="color: var(--somnia-pink);"></span> SOM</div>
+                    <div>SMONO Tokens: <span id="tokenBalance" style="color: var(--somnia-teal);"></span> SMONO</div>
+                </div>
+                <div class="auto-refresh-toggle">
+                    <label class="switch">
+                        <input type="checkbox" id="autoRefreshToggle" checked>
+                        <span class="slider"></span>
+                    </label>
+                    <span>Auto-Refresh</span>
+                </div>
+            </div>
+            
+            <div id="playerInfo">
+                <h3>PLAYER: <span id="playerStatus" style="color: var(--somnia-teal);"></span></h3>
+                <div>Position: <span id="playerPosition">0</span></div>
+                <div>Has NFT: <span id="playerNFT">No</span></div>
+            </div>
+            
+            <div id="gameActions">
+                <button id="startGameBtn" class="game-btn">🚀 START GAME</button>
+                <button id="rollDiceBtn" class="game-btn" disabled>🎲 ROLL DICE</button>
+                <button id="mintNFTBtn" class="game-btn" disabled>🖼 MINT NFT</button>
+            </div>
+            
+            <div id="tileDetails" style="display: none;">
+                <h3 id="tileName"></h3>
+                <div>Type: <span id="tileType"></span></div>
+                <div>Value: <span id="tileValue"></span> SMONO</div>
+            </div>
+            
+            <div id="gameLog" style="margin-top: 20px; max-height: 200px; overflow-y: auto;">
+                <h3>GAME LOG</h3>
+                <div id="logEntries"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // =====================
+        // GAME CONFIGURATION
+        // =====================
+        const config = {
+            initialTokens: '500000000000000000000', // 500 SMONO in wei
+            refreshInterval: 5000 // 5 seconds
+        };
+
+        // =====================
+        // SOMNIA CONFIGURATION
+        // =====================
+        const SOMNIA_TESTNET = {
+            chainId: "0xc488",
+            chainName: "Somnia Testnet",
+            nativeCurrency: {
+                name: "SOM",
+                symbol: "SOM",
+                decimals: 18
+            },
+            rpcUrls: ["https://testnet.somnia.xyz/rpc"],
+            blockExplorerUrls: ["https://testnet.somnia.xyz"]
+        };
+        
+        const CONTRACT_ADDRESS = "0xC7b77a0e02613Dd854C6A909Cd625D45eb97437C";
+        
+        // =====================
+        // SMART CONTRACT ABI
+        // =====================
+        const CONTRACT_ABI = [
+            {
+                "inputs": [],
+                "stateMutability": "nonpayable",
+                "type": "constructor"
+            },
+            {
+                "anonymous": false,
+                "inputs": [
+                    {
+                        "indexed": false,
+                        "internalType": "address",
+                        "name": "player",
+                        "type": "address"
+                    },
+                    {
+                        "indexed": false,
+                        "internalType": "uint256",
+                        "name": "roll",
+                        "type": "uint256"
+                    },
+                    {
+                        "indexed": false,
+                        "internalType": "uint256",
+                        "name": "newPosition",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "DiceRolled",
+                "type": "event"
+            },
+            {
+                "anonymous": false,
+                "inputs": [
+                    {
+                        "indexed": false,
+                        "internalType": "address",
+                        "name": "player",
+                        "type": "address"
+                    }
+                ],
+                "name": "GameStarted",
+                "type": "event"
+            },
+            {
+                "anonymous": false,
+                "inputs": [
+                    {
+                        "indexed": false,
+                        "internalType": "address",
+                        "name": "player",
+                        "type": "address"
+                    },
+                    {
+                        "indexed": false,
+                        "internalType": "uint256",
+                        "name": "penalty",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "LossLanded",
+                "type": "event"
+            },
+            {
+                "inputs": [],
+                "name": "mintNFT",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "anonymous": false,
+                "inputs": [
+                    {
+                        "indexed": false,
+                        "internalType": "address",
+                        "name": "player",
+                        "type": "address"
+                    },
+                    {
+                        "indexed": false,
+                        "internalType": "uint256",
+                        "name": "tokenId",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "NFTMinted",
+                "type": "event"
+            },
+            {
+                "anonymous": false,
+                "inputs": [
+                    {
+                        "indexed": false,
+                        "internalType": "address",
+                        "name": "player",
+                        "type": "address"
+                    },
+                    {
+                        "indexed": false,
+                        "internalType": "uint256",
+                        "name": "reward",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "ProfitLanded",
+                "type": "event"
+            },
+            {
+                "inputs": [],
+                "name": "rollDice",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "startGame",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "anonymous": false,
+                "inputs": [
+                    {
+                        "indexed": true,
+                        "internalType": "address",
+                        "name": "from",
+                        "type": "address"
+                    },
+                    {
+                        "indexed": true,
+                        "internalType": "address",
+                        "name": "to",
+                        "type": "address"
+                    },
+                    {
+                        "indexed": false,
+                        "internalType": "uint256",
+                        "name": "value",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "Transfer",
+                "type": "event"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "address",
+                        "name": "",
+                        "type": "address"
+                    }
+                ],
+                "name": "balanceOf",
+                "outputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "",
+                        "type": "uint256"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "decimals",
+                "outputs": [
+                    {
+                        "internalType": "uint8",
+                        "name": "",
+                        "type": "uint8"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "address",
+                        "name": "player",
+                        "type": "address"
+                    }
+                ],
+                "name": "getNFTBalance",
+                "outputs": [
+                    {
+                        "internalType": "bool",
+                        "name": "",
+                        "type": "bool"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "address",
+                        "name": "player",
+                        "type": "address"
+                    }
+                ],
+                "name": "getPlayerPosition",
+                "outputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "",
+                        "type": "uint256"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "position",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "getTile",
+                "outputs": [
+                    {
+                        "internalType": "string",
+                        "name": "",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "enum SoloMonopoly.TileType",
+                        "name": "",
+                        "type": "uint8"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "",
+                        "type": "int256"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "name",
+                "outputs": [
+                    {
+                        "internalType": "string",
+                        "name": "",
+                        "type": "string"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "nftOwnerOf",
+                "outputs": [
+                    {
+                        "internalType": "address",
+                        "name": "",
+                        "type": "address"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "nftSupply",
+                "outputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "",
+                        "type": "uint256"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "address",
+                        "name": "",
+                        "type": "address"
+                    }
+                ],
+                "name": "players",
+                "outputs": [
+                    {
+                        "internalType": "uint8",
+                        "name": "position",
+                        "type": "uint8"
+                    },
+                    {
+                        "internalType": "bool",
+                        "name": "hasStarted",
+                        "type": "bool"
+                    },
+                    {
+                        "internalType": "bool",
+                        "name": "hasMintedNFT",
+                        "type": "bool"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "symbol",
+                "outputs": [
+                    {
+                        "internalType": "string",
+                        "name": "",
+                        "type": "string"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "totalSupply",
+                "outputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "",
+                        "type": "uint256"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            }
+        ];
+
+        // =====================
+        // GAME STATE
+        // =====================
+        let web3;
+        let contract;
+        let accounts = [];
+        let currentPlayerPosition = 0;
+        let gameStarted = false;
+        let playerHasNFT = false;
+        let tileData = [];
+        let refreshInterval;
+        let autoRefreshEnabled = true;
+        
+        // Board configuration - 16 tiles in a circular pattern
+        const BOARD_SIZE = 16;
+        const tilePositions = [];
+        
+        // Generate positions for all 16 tiles in a circular pattern
+        for (let i = 0; i < BOARD_SIZE; i++) {
+            let left, top;
+            if (i < 4) {
+                // Bottom row (left to right)
+                left = 85 - (i * 20);
+                top = 85;
+            } else if (i < 8) {
+                // Left side (bottom to top)
+                left = 5;
+                top = 85 - ((i - 4) * 20);
+            } else if (i < 12) {
+                // Top row (right to left)
+                left = 5 + ((i - 8) * 20);
+                top = 5;
+            } else {
+                // Right side (top to bottom)
+                left = 85;
+                top = 5 + ((i - 12) * 20);
+            }
+            tilePositions.push({left: `${left}%`, top: `${top}%`});
+        }
+
+        // =====================
+        // INITIALIZATION
+        // =====================
+        document.addEventListener('DOMContentLoaded', async () => {
+            initializeBoard();
+            setupEventListeners();
+            
+            // Check if wallet is already connected
+            if (window.ethereum && window.ethereum.selectedAddress) {
+                await initializeWeb3();
+            } else {
+                // Try to connect automatically if MetaMask is available
+                if (window.ethereum) {
+                    await initializeWeb3();
+                }
+            }
+            
+            // Setup auto-refresh toggle
+            document.getElementById('autoRefreshToggle').addEventListener('change', (e) => {
+                autoRefreshEnabled = e.target.checked;
+                if (autoRefreshEnabled) {
+                    startAutoRefresh();
+                } else {
+                    stopAutoRefresh();
+                }
+            });
+        });
+        
+        function startAutoRefresh() {
+            if (refreshInterval) clearInterval(refreshInterval);
+            refreshInterval = setInterval(async () => {
+                if (accounts.length > 0 && contract) {
+                    await updateGameState();
+                    await updateUI();
+                }
+            }, config.refreshInterval);
+        }
+        
+        function stopAutoRefresh() {
+            if (refreshInterval) clearInterval(refreshInterval);
+        }
+        
+        async function initializeWeb3() {
+            if (!window.ethereum) {
+                alert("Please install MetaMask or a Somnia-compatible wallet!");
+                addLogEntry("Wallet not detected. Please install MetaMask.");
+                return;
+            }
+            
+            try {
+                const connectBtn = document.getElementById('connectWallet');
+                connectBtn.disabled = true;
+                connectBtn.textContent = "Connecting...";
+                connectBtn.classList.add('loading');
+                
+                // Request account access
+                accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                
+                // Check if already on correct network
+                const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+                
+                if (chainId !== SOMNIA_TESTNET.chainId) {
+                    try {
+                        await window.ethereum.request({
+                            method: 'wallet_switchEthereumChain',
+                            params: [{ chainId: SOMNIA_TESTNET.chainId }],
+                        });
+                    } catch (switchError) {
+                        // This error code indicates that the chain has not been added to MetaMask
+                        if (switchError.code === 4902) {
+                            try {
+                                await window.ethereum.request({
+                                    method: 'wallet_addEthereumChain',
+                                    params: [SOMNIA_TESTNET],
+                                });
+                            } catch (addError) {
+                                console.error("Error adding Somnia network:", addError);
+                                addLogEntry("Failed to add Somnia network");
+                                resetConnectButton();
+                                return;
+                            }
+                        } else {
+                            console.error("Error switching to Somnia network:", switchError);
+                            addLogEntry("Failed to switch to Somnia network");
+                            resetConnectButton();
+                            return;
+                        }
+                    }
+                }
+                
+                web3 = new Web3(window.ethereum);
+                contract = new web3.eth.Contract(CONTRACT_ABI, CONTRACT_ADDRESS);
+                
+                // Preload tile data
+                await loadTileData();
+                
+                // Update UI and game state
+                await updateUI();
+                await updateGameState();
+                
+                // Start auto-refresh
+                startAutoRefresh();
+                
+                // Listen for account changes
+                window.ethereum.on('accountsChanged', (newAccounts) => {
+                    accounts = newAccounts;
+                    updateUI();
+                    updateGameState();
+                    addLogEntry("Wallet account changed", 'neutral');
+                });
+                
+                // Listen for chain changes
+                window.ethereum.on('chainChanged', () => {
+                    window.location.reload();
+                });
+                
+                // Listen for contract events
+                setupContractEventListeners();
+                
+                // Successfully connected
+                connectBtn.textContent = "CONNECTED";
+                connectBtn.classList.remove('loading');
+                connectBtn.style.backgroundColor = "#4CAF50";
+                connectBtn.disabled = true;
+                
+                addLogEntry("Wallet connected successfully", 'neutral');
+                
+            } catch (error) {
+                console.error("Error connecting wallet:", error);
+                addLogEntry("Error connecting wallet: " + (error.message || error), 'loss');
+                resetConnectButton();
+            }
+        }
+        
+        async function loadTileData() {
+            tileData = [];
+            for (let i = 0; i < BOARD_SIZE; i++) {
+                const tile = await contract.methods.getTile(i).call();
+                tileData.push({
+                    name: tile[0],
+                    type: tile[1],
+                    value: tile[2]
+                });
+                updateTileVisual(i, tile[0], tile[1]);
+            }
+        }
+        
+        function updateTileVisual(index, name, type) {
+            const tile = document.getElementById(`tile-${index}`);
+            if (tile) {
+                tile.textContent = name;
+                tile.className = 'tile';
+                
+                if (type === '1') { // PROFIT
+                    tile.classList.add('tile-profit');
+                } else if (type === '2') { // LOSS
+                    tile.classList.add('tile-loss');
+                }
+            }
+        }
+        
+        function setupEventListeners() {
+            document.getElementById('connectWallet').addEventListener('click', initializeWeb3);
+            document.getElementById('rollDiceBtn').addEventListener('click', rollDice);
+            document.getElementById('startGameBtn').addEventListener('click', startGame);
+            document.getElementById('mintNFTBtn').addEventListener('click', mintNFT);
+        }
+        
+        function setupContractEventListeners() {
+            // Contract event listeners
+            contract.events.GameStarted({})
+                .on('data', event => {
+                    if (event.returnValues.player.toLowerCase() === accounts[0].toLowerCase()) {
+                        addLogEntry(`Game started! Received ${web3.utils.fromWei(config.initialTokens)} SMONO`, 'neutral');
+                        gameStarted = true;
+                        updateGameState();
+                    }
+                })
+                .on('error', error => {
+                    console.error("GameStarted event error:", error);
+                    addLogEntry("Error listening to game events", 'loss');
+                });
+            
+            contract.events.DiceRolled({})
+                .on('data', event => {
+                    if (event.returnValues.player.toLowerCase() === accounts[0].toLowerCase()) {
+                        addLogEntry(`Rolled ${event.returnValues.roll}, moved to position ${event.returnValues.newPosition}`, 'neutral');
+                        updateGameState();
+                    }
+                })
+                .on('error', error => {
+                    console.error("DiceRolled event error:", error);
+                });
+            
+            contract.events.ProfitLanded({})
+                .on('data', event => {
+                    if (event.returnValues.player.toLowerCase() === accounts[0].toLowerCase()) {
+                        addLogEntry(`+${web3.utils.fromWei(event.returnValues.reward)} SMONO from landing!`, 'profit');
+                        updateGameState();
+                    }
+                })
+                .on('error', error => {
+                    console.error("ProfitLanded event error:", error);
+                });
+            
+            contract.events.LossLanded({})
+                .on('data', event => {
+                    if (event.returnValues.player.toLowerCase() === accounts[0].toLowerCase()) {
+                        addLogEntry(`-${web3.utils.fromWei(event.returnValues.penalty)} SMONO from landing!`, 'loss');
+                        updateGameState();
+                    }
+                })
+                .on('error', error => {
+                    console.error("LossLanded event error:", error);
+                });
+            
+            contract.events.NFTMinted({})
+                .on('data', event => {
+                    if (event.returnValues.player.toLowerCase() === accounts[0].toLowerCase()) {
+                        addLogEntry(`Minted NFT #${event.returnValues.tokenId}!`, 'profit');
+                        playerHasNFT = true;
+                        updateGameState();
+                    }
+                })
+                .on('error', error => {
+                    console.error("NFTMinted event error:", error);
+                });
+            
+            contract.events.Transfer({})
+                .on('data', event => {
+                    if (event.returnValues.from === '0x0000000000000000000000000000000000000000') {
+                        // Mint event
+                        if (event.returnValues.to.toLowerCase() === accounts[0].toLowerCase()) {
+                            addLogEntry(`Received ${web3.utils.fromWei(event.returnValues.value)} SMONO`, 'profit');
+                            updateGameState();
+                        }
+                    }
+                })
+                .on('error', error => {
+                    console.error("Transfer event error:", error);
+                });
+        }
+        
+        function resetConnectButton() {
+            const connectBtn = document.getElementById('connectWallet');
+            connectBtn.disabled = false;
+            connectBtn.textContent = "CONNECT SOMNIA WALLET";
+            connectBtn.classList.remove('loading');
+            connectBtn.style.backgroundColor = "";
+        }
+        
+        function initializeBoard() {
+            const board = document.getElementById('board');
+            
+            // Create tiles
+            for (let i = 0; i < BOARD_SIZE; i++) {
+                const tile = document.createElement('div');
+                tile.className = 'tile';
+                tile.id = `tile-${i}`;
+                tile.style.left = tilePositions[i].left;
+                tile.style.top = tilePositions[i].top;
+                tile.textContent = `Loading...`;
+                tile.addEventListener('click', () => showTileDetails(i));
+                board.appendChild(tile);
+            }
+            
+            // Create player token
+            const token = document.createElement('div');
+            token.className = 'player-token';
+            token.id = 'player-token';
+            token.style.display = 'none';
+            board.appendChild(token);
+        }
+        
+        // =====================
+        // GAME ACTIONS
+        // =====================
+        async function rollDice() {
+            try {
+                document.getElementById('rollDiceBtn').disabled = true;
+                document.getElementById('rollDiceBtn').classList.add('dice-animation');
+                
+                const diceResult = document.getElementById('diceResult');
+                diceResult.style.display = 'block';
+                diceResult.textContent = '🎲 Rolling...';
+                
+                // Simulate dice roll animation
+                for (let i = 0; i < 3; i++) {
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                    diceResult.textContent = `🎲 Rolling... ${i+1}`;
+                }
+                
+                // Actual contract interaction
+                await contract.methods.rollDice().send({ from: accounts[0] });
+                
+                setTimeout(() => {
+                    diceResult.style.display = 'none';
+                    document.getElementById('rollDiceBtn').classList.remove('dice-animation');
+                }, 2000);
+                
+            } catch (error) {
+                console.error("Error rolling dice:", error);
+                addLogEntry("Error rolling dice: " + error.message, 'loss');
+                document.getElementById('rollDiceBtn').disabled = false;
+                document.getElementById('rollDiceBtn').classList.remove('dice-animation');
+                document.getElementById('diceResult').style.display = 'none';
+            }
+        }
+        
+        async function startGame() {
+            try {
+                document.getElementById('startGameBtn').disabled = true;
+                document.getElementById('startGameBtn').textContent = "Starting...";
+                document.getElementById('startGameBtn').classList.add('loading');
+                
+                await contract.methods.startGame().send({ from: accounts[0] });
+                
+                document.getElementById('startGameBtn').textContent = "Game Started";
+                document.getElementById('startGameBtn').style.backgroundColor = "#4CAF50";
+                document.getElementById('startGameBtn').classList.remove('loading');
+                
+                // Show player token
+                document.getElementById('player-token').style.display = 'block';
+                
+            } catch (error) {
+                console.error("Error starting game:", error);
+                addLogEntry("Error starting game: " + error.message, 'loss');
+                document.getElementById('startGameBtn').disabled = false;
+                document.getElementById('startGameBtn').textContent = "🚀 START GAME";
+                document.getElementById('startGameBtn').style.backgroundColor = "";
+                document.getElementById('startGameBtn').classList.remove('loading');
+            }
+        }
+        
+        async function mintNFT() {
+            try {
+                document.getElementById('mintNFTBtn').disabled = true;
+                document.getElementById('mintNFTBtn').textContent = "Minting...";
+                document.getElementById('mintNFTBtn').classList.add('loading');
+                
+                await contract.methods.mintNFT().send({ from: accounts[0] });
+                
+                document.getElementById('mintNFTBtn').textContent = "NFT Minted!";
+                document.getElementById('mintNFTBtn').style.backgroundColor = "#4CAF50";
+                document.getElementById('mintNFTBtn').classList.remove('loading');
+                
+            } catch (error) {
+                console.error("Error minting NFT:", error);
+                addLogEntry("Error minting NFT: " + error.message, 'loss');
+                document.getElementById('mintNFTBtn').disabled = false;
+                document.getElementById('mintNFTBtn').textContent = "🖼 MINT NFT";
+                document.getElementById('mintNFTBtn').style.backgroundColor = "";
+                document.getElementById('mintNFTBtn').classList.remove('loading');
+            }
+        }
+        
+        // =====================
+        // UI UPDATES
+        // =====================
+        async function updateUI() {
+            if (accounts.length > 0) {
+                document.getElementById('connectWallet').style.display = 'none';
+                document.getElementById('walletInfo').style.display = 'block';
+                
+                const shortAddress = `${accounts[0].substring(0, 6)}...${accounts[0].substring(38)}`;
+                document.getElementById('walletAddress').textContent = shortAddress;
+                
+                try {
+                    // Get native token balance
+                    const balance = await web3.eth.getBalance(accounts[0]);
+                    document.getElementById('somBalance').textContent = parseFloat(web3.utils.fromWei(balance, 'ether')).toFixed(4);
+                    
+                    // Get SMONO token balance
+                    const tokenBalance = await contract.methods.balanceOf(accounts[0]).call();
+                    document.getElementById('tokenBalance').textContent = parseFloat(web3.utils.fromWei(tokenBalance, 'ether')).toFixed(2);
+                    
+                } catch (error) {
+                    console.error("Error getting balances:", error);
+                    addLogEntry("Error updating balances: " + error.message, 'loss');
+                }
+            }
+        }
+        
+        async function updateGameState() {
+            if (!contract || !accounts[0]) return;
+            
+            try {
+                // Check if player has started the game
+                const player = await contract.methods.players(accounts[0]).call();
+                gameStarted = player.hasStarted;
+                
+                if (gameStarted) {
+                    // Update player position
+                    currentPlayerPosition = await contract.methods.getPlayerPosition(accounts[0]).call();
+                    document.getElementById('playerPosition').textContent = currentPlayerPosition;
+                    
+                    // Update token position on board
+                    const token = document.getElementById('player-token');
+                    token.style.left = tilePositions[currentPlayerPosition].left;
+                    token.style.top = tilePositions[currentPlayerPosition].top;
+                    
+                    // Update NFT status
+                    playerHasNFT = await contract.methods.getNFTBalance(accounts[0]).call();
+                    document.getElementById('playerNFT').textContent = playerHasNFT ? "Yes" : "No";
+                    document.getElementById('playerNFT').style.color = playerHasNFT ? "#4CAF50" : "#F44336";
+                    
+                    // Highlight current position
+                    highlightCurrentPosition(currentPlayerPosition);
+                    
+                    // Enable/disable buttons based on game state
+                    document.getElementById('rollDiceBtn').disabled = !gameStarted;
+                    
+                    // Only enable mint NFT button if player has enough tokens and doesn't already have NFT
+                    const tokenBalance = await contract.methods.balanceOf(accounts[0]).call();
+                    const nftThreshold = web3.utils.toWei('1000', 'ether');
+                    const canMintNFT = !playerHasNFT && tokenBalance >= nftThreshold;
+                    document.getElementById('mintNFTBtn').disabled = !canMintNFT;
+                }
+                
+                // Update player status display
+                document.getElementById('playerStatus').textContent = gameStarted ? "Active" : "Not Started";
+                document.getElementById('playerStatus').style.color = gameStarted ? "#4CAF50" : "#F44336";
+                
+            } catch (error) {
+                console.error("Error updating game state:", error);
+                addLogEntry("Error updating game state: " + error.message, 'loss');
+            }
+        }
+        
+        function highlightCurrentPosition(position) {
+            // Reset all tiles
+            for (let i = 0; i < BOARD_SIZE; i++) {
+                const tile = document.getElementById(`tile-${i}`);
+                tile.style.boxShadow = 'none';
+                tile.style.zIndex = '1';
+            }
+            
+            // Highlight current position
+            const currentTile = document.getElementById(`tile-${position}`);
+            if (currentTile) {
+                currentTile.style.boxShadow = '0 0 15px var(--somnia-pink)';
+                currentTile.style.zIndex = '10';
+            }
+        }
+        
+        async function showTileDetails(tileId) {
+            try {
+                const tileDetails = await contract.methods.getTile(tileId).call();
+                const panel = document.getElementById('tileDetails');
+                panel.style.display = 'block';
+                
+                document.getElementById('tileName').textContent = tileDetails[0];
+                
+                // Convert tile type to readable format
+                let tileType;
+                switch(tileDetails[1]) {
+                    case '0': tileType = "NEUTRAL"; break;
+                    case '1': tileType = "PROFIT"; break;
+                    case '2': tileType = "LOSS"; break;
+                    default: tileType = "UNKNOWN";
+                }
+                document.getElementById('tileType').textContent = tileType;
+                
+                // Format value (convert from wei and handle negative values)
+                const value = web3.utils.fromWei(tileDetails[2].replace('-', ''));
+                document.getElementById('tileValue').textContent = 
+                    tileDetails[1] === '2' ? `-${value}` : value;
+                
+            } catch (error) {
+                console.error("Error getting tile details:", error);
+                addLogEntry("Error getting tile details: " + error.message, 'loss');
+            }
+        }
+        
+        function addLogEntry(message, type = 'neutral') {
+            const log = document.getElementById('logEntries');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-entry-${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+    </script>
+</body>
+</html>
